@@ -1,6 +1,13 @@
 {
     "name": "wisymfony/slug-history-bundle",
     "description": "Automated SEO Management with 301 Redirects",
+    "keywords": [
+        "slug",
+        "seo",
+        "redirect",
+        "not found"
+    ],
+    "homepage": "https://github.com/wisymfony/slug-history-bundle",
     "type": "symfony-bundle",
     "license": "MIT",
     "autoload": {
@@ -11,9 +18,18 @@
     "authors": [
         {
             "name": "Wisoft",
+            "email": "contact@wi-soft.com"
+        },
+        {
+            "name": "AHOMLANTO David",
             "email": "david@wi-soft.com"
         }
     ],
     "minimum-stability": "stable",
-    "require": {}
+    "require": {
+        "php": ">=8.2"
+    },
+    "conflict": {
+        "symfony/process": ">=6"
+    }
 }
