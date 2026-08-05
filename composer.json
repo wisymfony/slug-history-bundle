@@ -1,0 +1,19 @@
+{
+    "name": "wisymfony/slug-history-bundle",
+    "description": "Automated SEO Management with 301 Redirects",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Wisymfony\\SlugHistoryBundle\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Wisoft",
+            "email": "david@wi-soft.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {}
+}
