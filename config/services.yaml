@@ -1,0 +1,15 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+    
+    Wisymfony\SlugHistoryBundle\:
+        resource: "../src/"
+        exclude:
+          - ../src/Attribute
+          - ../src/SlugHistoryBundle.php
+  
+    Wisymfony\SlugHistoryBundle\EventListener\DoctrineSlugListener:
+        tags:
+            - { name: doctrine.event_listener, event: preUpdate, method: preUpdate }
+            - { name: doctrine.event_listener, event: postUpdate, method: postUpdate }

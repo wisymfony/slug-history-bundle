@@ -86,10 +86,12 @@ class Article
 
 ## Attribute Parameters
 
-Parameter | Type | Default | Description
-routeName | string | Required | The target Symfony route name used to generate the redirect URL.
-slugProperty | string | 'slug' | The property name on the entity storing the slug value.
-routeParamName | string | 'slug' | "The parameter name expected by the Symfony route (e.g.,{slug})."
+| Parameter | Type | Default | Description |
+| :--- | :---: | ---: | :--- |
+| routeName | string | Required | The target Symfony route name used to generate the redirect URL. |
+| slugProperty | string | 'slug' | The property name on the entity storing the slug value. |
+| routeParamName | string | 'slug' | The parameter name expected by the Symfony route (e.g., {slug}). |
+
 
 ## Testing
 Run unit and integration tests using PHPUnit:
