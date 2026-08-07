@@ -13,11 +13,30 @@ use Symfony\Component\HttpKernel\KernelEvents;
 use Wisymfony\SlugHistoryBundle\Service\SlugManager;
 
 #[AsEventListener(event : KernelEvents::EXCEPTION, priority: 10)]
+/**
+ * Listener for kernel exceptions that attempts to redirect old slugs.
+ *
+ * When a `NotFoundHttpException` is thrown, this listener queries `SlugManager`
+ * to resolve the requested path to a new path and issues a 301 redirect when
+ * a mapping exists.
+ */
 class ExceptionRedirectListener
 {
+    /**
+     * Constructor.
+     *
+     * @param SlugManager $slugManager Service used to resolve old paths.
+     */
     public function __construct(private SlugManager $slugManager){
     }
 
+    /**
+     * Event handler invoked on kernel exceptions.
+     *
+     * @param ExceptionEvent $event The kernel exception event.
+     *
+     * @return void
+     */
     public function __invoke(ExceptionEvent $event) {
         if (!($event->getThrowable() instanceof NotFoundHttpException)) return;
 

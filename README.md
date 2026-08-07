@@ -2,34 +2,25 @@
 
 An automated SEO preservation bundle for Symfony 6.4, 7.x, and 8.x.
 
-When a resource slug changes (e.g., an article title is updated), old links across the web and search engine indexes break into 404 Not Found pages. This bundle automatically tracks slug changes in Doctrine entities and intercepts 404 errors to issue seamless 301 Moved Permanently HTTP redirects to the new URLs.
+When a resource slug changes (for example, an article title is updated), old links can break and return 404 Not Found. This bundle tracks slug updates in Doctrine entities and intercepts 404 errors to return a 301 Moved Permanently redirect to the current URL.
 
 ---
 
 ## Features
 
-- Zero-Controller Logic: Redirections happen automatically via HttpKernel exception listeners.
-- PHP 8 Attributes: Configure slug tracking directly on your entities using #[Slugged].
-- SEO Preservation: Returns proper 301 HTTP status codes to preserve search engine ranking.
-- Doctrine ORM Integration: Listens to postUpdate events to capture slug changes seamlessly.
-- Lightweight and Modern: Built natively for Symfony 6.4, 7.x, and 8.x using AbstractBundle.
+- Zero-controller redirection: redirections happen automatically via a kernel exception listener.
+- PHP 8 attributes: mark entity slug fields with #[Slugged].
+- Cache-only storage: no database table or migration is required; slug mappings are stored with Symfony Cache.
+- Doctrine ORM integration: listens to preUpdate/postUpdate lifecycle events to detect slug changes.
+- Lightweight and modern: compatible with Symfony 6.4, 7.x, and 8.x.
 
 ---
 
 ## How It Works
 
-<div>
-    <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark-mode.svg">
-        <source media="(prefers-color-scheme: light)" srcset="assets/logo-light-mode.svg">
-        <img alt="Logo du projet" src="assets/logo-light-mode.svg">
-    </picture>
-</div>
+1. Change tracking: When an entity property annotated with #[Slugged] changes, `DoctrineSlugListener` records the old route path and the new route path in cache.
 
-
-1. Change Tracking: When an entity marked with #[Slugged] updates its slug, DoctrineSlugListener logs the old slug, new slug, and route parameters into the slug_history database table.
-
-2. Automatic Redirection: When a user or crawler accesses an old URL, Symfony throws a NotFoundHttpException (404). The ExceptionRedirectListener intercepts it, looks up the old slug, and immediately returns a 301 Moved Permanently response pointing to the updated route.
+2. Automatic redirection: When Symfony throws a `NotFoundHttpException` for an old slug URL, `ExceptionRedirectListener` checks the cache and returns a `301 Moved Permanently` redirect to the new path.
 
 ---
 

@@ -28,7 +28,16 @@
     "minimum-stability": "stable",
     "require": {
         "php": ">=8.2",
-        "symfony/framework-bundle": "^6.0|^7.0|^8.0"
+        "symfony/framework-bundle": "^6.0|^7.0|^8.0",
+        "doctrine/orm": "^2.13 || ^3.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Wisymfony\\SlugHistoryBundle\\Tests\\": "tests/"
+        }
     },
     "conflict": {
         "symfony/process": ">=6"
