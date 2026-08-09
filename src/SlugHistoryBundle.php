@@ -6,8 +6,6 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 
-
-
 /**
  * Bundle class for Wisymfony Slug History.
  *
@@ -15,7 +13,7 @@ use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
  */
 final class SlugHistoryBundle extends AbstractBundle
 {
-    const VERSION = '1.0.0';
+    public const VERSION = '1.0.0';
     /**
      * Load and configure the bundle extension.
      *

@@ -10,8 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\KernelEvents;
-use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
-use Wisymfony\SlugHistoryBundle\Service\SlugManager;
+use Wisymfony\SlugHistoryBundle\Service\Manager\SlugManager;
 
 #[AsEventListener(event : KernelEvents::EXCEPTION, priority: 10)]
 /**
@@ -28,7 +27,8 @@ class ExceptionRedirectListener
      *
      * @param SlugManager $slugManager Service used to resolve old paths.
      */
-    public function __construct(private SlugManager $slugManager){
+    public function __construct(private SlugManager $slugManager)
+    {
     }
 
     /**
@@ -38,12 +38,17 @@ class ExceptionRedirectListener
      *
      * @return void
      */
-    public function __invoke(ExceptionEvent $event) {
-        if (!($event->getThrowable() instanceof NotFoundHttpException)) return;
+    public function __invoke(ExceptionEvent $event)
+    {
+        if (!($event->getThrowable() instanceof NotFoundHttpException)) {
+            return;
+        }
 
         $path = $event->getRequest()->getPathInfo();
-        if (!$path || empty($path)) return;
-        
+        if (!$path || empty($path)) {
+            return;
+        }
+
         $newPath = $this->slugManager->getNewPath($path);
         if (is_array($newPath) && isset($newPath['path']) && $newPath['path'] !== $path && str_starts_with($newPath['path'], '/')) {
             $absoluteUrl = $event->getRequest()->getSchemeAndHttpHost() . $newPath['path'];

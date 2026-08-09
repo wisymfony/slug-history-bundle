@@ -2,41 +2,50 @@
 
 declare(strict_types=1);
 
-namespace Wisymfony\SlugHistoryBundle\Service;
+namespace Wisymfony\SlugHistoryBundle\Service\Manager;
 
 use ReflectionClass;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Routing\RouterInterface;
-use Symfony\Contracts\Cache\CacheInterface;
 use Wisymfony\SlugHistoryBundle\Attribute\Slugged;
-
+use Wisymfony\SlugHistoryBundle\Service\Storage\SlugStorageInterface;
 /**
  * Service that manages slug history mappings and generates redirect targets.
  *
  * Responsibilities:
  * - Detect changes on entity slug properties annotated with `Slugged`.
- * - Generate old and new route paths and store their mapping in cache.
+ * - Generate old and new route paths and store their mapping in the slug storage.
  * - Provide a lookup to resolve an old path to the current path for 301 redirects.
  */
 final class SlugManager
 {
     private array $slugUpdateList = [];
+
     /**
      * Cache of parsed `Slugged` attribute metadata per class to avoid repeated reflection.
      *
      * @var array<string, array<int, array{name:string,attr:Slugged}>>
      */
     private array $sluggedCache = [];
+
     /**
      * Constructor.
      *
-     * @param CacheInterface  $cacheInterface Cache used to store slug mappings.
-     * @param RouterInterface $routerInterface Router used to generate route paths.
+     * @param SlugStorageInterface $storageInterface Storage used to store slug mappings.
+     * @param RouterInterface      $routerInterface Router used to generate route paths.
      */
-    public function __construct(private CacheInterface $cacheInterface, private RouterInterface $routerInterface)
+    public function __construct(
+        #[Autowire(
+            expression: 'parameter("wisymfony_slug_history.storage") matches \'/^database$/i\' ? service("wisymfony_slug_history.database_slug_storage") : service("wisymfony_slug_history.cache_slug_storage")'
+        )]
+        private SlugStorageInterface $storageInterface,
+        private RouterInterface $routerInterface
+    )
     {
     }
 
-    public function getRouterInterface() : RouterInterface {
+    public function getRouterInterface(): RouterInterface
+    {
         return $this->routerInterface;
     }
 
@@ -58,7 +67,7 @@ final class SlugManager
         foreach ($sluggers as $slugger) {
             if ($slugger['attr'] instanceof Slugged) {
                 $attr = $slugger['attr'];
-                
+
                 $oldSlug = $this->getFieldValueString($object, $slugger['name']);
                 if (
                     !empty($attr->from) &&
@@ -87,8 +96,11 @@ final class SlugManager
                         $newRouteParams = array_merge($newRouteParams, $attr->routeDefaultParams);
                     }
 
-                    $oldPath = $this->routerInterface->generate($attr->routeName, $this->applyMapperRouteParams($object, $oldRouteParams));
-                    $newPath = $this->routerInterface->generate($attr->routeName, $this->applyMapperRouteParams($object, $newRouteParams));
+                    $oldRouteParams = $this->applyMapperRouteParams($object, $oldRouteParams, $entityChangeSet);
+                    $newRouteParams = $this->applyMapperRouteParams($object, $newRouteParams);
+
+                    $oldPath = $this->routerInterface->generate($attr->routeName, $oldRouteParams);
+                    $newPath = $this->routerInterface->generate($attr->routeName, $newRouteParams);
                     if ($oldPath != $newPath) {
                         $this->slugUpdateList[$oldPath] = [
                             'path' => $newPath,
@@ -104,21 +116,19 @@ final class SlugManager
     }
 
     /**
-     * Persist the collected slug mappings into cache.
+     * Persist the collected slug mappings into the configured storage.
      *
-     * This method writes each recorded mapping to the configured `CacheInterface`.
-     * It clears any existing entries for both the old and new path cache keys
-     * before saving the mapping.
+     * This method writes each recorded mapping to the injected
+     * `SlugStorageInterface` implementation.
      *
      * @return void
      */
     public function saveSlugUpdateList(): void
     {
         if (!empty($this->slugUpdateList)) {
+            
             foreach ($this->slugUpdateList as $oldPath => $newPathData) {
-                $cacheKey = $this->generateCacheKeyBy($oldPath);
-                $this->cacheInterface->delete($cacheKey);
-                $this->cacheInterface->get($cacheKey, fn () => $newPathData);
+                $this->storageInterface->savePath($oldPath, $newPathData);
             }
             $this->slugUpdateList = [];
         }
@@ -129,7 +139,7 @@ final class SlugManager
      *
      * @param string $oldPath The requested old path to resolve (e.g. `/blog/old-slug`).
      *
-     * @return array|null The resolved current path if found in cache, or null when not found.
+     * @return array|null The resolved current path if found in storage, or null when not found.
      */
     public function getNewPath(string $oldPath): ?array
     {
@@ -139,7 +149,7 @@ final class SlugManager
 
         while ($currentPath !== null && !isset($visited[$currentPath])) {
             $visited[$currentPath] = true;
-            $entry = $this->readCacheEntry($currentPath);
+            $entry = $this->storageInterface->findPath($currentPath);
 
             if (!is_array($entry) || !isset($entry['path']) || !is_string($entry['path'])) {
                 break;
@@ -205,44 +215,28 @@ final class SlugManager
     }
 
     /**
-     * Remove a saved slug path from cache and rewire its immediate predecessor.
+     * Remove a saved slug path from storage and rewire its immediate predecessor.
      *
      * Behaviour:
-     * - Reads the cache entry for `$path`. If the entry exists and contains a
+     * - Reads the stored entry for `$path`. If the entry exists and contains a
      *   `'path'` value (the successor), and also contains an `'oldPath'` value,
-     *   then the method will load the cache entry for that `oldPath` and,
-     *   if it currently points to `$path`, update it to point to the successor.
-     * - Finally the cache entry for `$path` itself is removed.
+     *   then the method will load the entry for that `oldPath` and, if it
+     *   currently points to `$path`, update it to point to the successor.
+     * - Finally the stored entry for `$path` itself is removed.
      *
      * Notes / limitations:
      * - This rewiring only updates a single predecessor stored in the
      *   `'oldPath'` field of the removed entry; it doesn't traverse or rebuild
      *   full predecessor lists or reverse-indexes.
-     * - Cache keys are generated using `generateCacheKeyBy()`; callers that
-     *   maintain additional reverse indices must keep them in sync separately.
      *
      * @param string $path Absolute route path to remove from slug history.
      */
-    public function removePath(string $path) : void {
-        $pathData = $this->readCacheEntry($path);
-        if (is_array($pathData) && isset($pathData['path'])) {
-            $pathFinal = $pathData['path'];
-            if (isset($pathData['oldPath']) && !empty($pathData['oldPath'])) {
-                $oldPathData = $this->readCacheEntry($pathData['oldPath']);
-                if (isset($oldPathData['path']) && $oldPathData['path'] === $path) {
-                    $oldPathData['path'] = $pathFinal;
-                    $cacheKeyOld = $this->generateCacheKeyBy($pathData['oldPath']);
-                    $this->cacheInterface->delete($cacheKeyOld);
-                    $this->cacheInterface->get($cacheKeyOld, fn () => $oldPathData);
-                }
-            }
-        }
-
-        $cacheKey = $this->generateCacheKeyBy($path);
-        $this->cacheInterface->delete($cacheKey);
+    public function removePath(string $path): void
+    {
+        $this->storageInterface->removePath($path);
     }
 
-    private function applyMapperRouteParams(object $object, array $routeParams): array
+    private function applyMapperRouteParams(object $object, array $routeParams, array $entityChangeSet = []): array
     {
         $result = [];
         foreach ($routeParams as $key => $value) {
@@ -251,7 +245,11 @@ final class SlugManager
                 $fieldPath = explode('.', substr($value, 1));
                 foreach ($fieldPath as $index => $fieldName) {
                     if ($index === 0) {
-                        $fieldValue = $this->getFieldValue($object, $fieldName);
+                        if (isset($entityChangeSet[$fieldName])) {
+                            $fieldValue = $entityChangeSet[$fieldName][0];
+                        } else {
+                            $fieldValue = $this->getFieldValue($object, $fieldName);
+                        }
                     } else {
                         if (is_object($fieldValue)) {
                             $fieldValue = $this->getFieldValue($fieldValue, $fieldName);
@@ -265,14 +263,6 @@ final class SlugManager
             $result[$key] = $fieldValue;
         }
         return $result;
-    }
-
-    private function readCacheEntry(string $path): ?array
-    {
-        $cacheKey = $this->generateCacheKeyBy($path);
-        $payload = $this->cacheInterface->get($cacheKey, fn () => null);
-
-        return is_array($payload) ? $payload : null;
     }
 
     /**
@@ -377,17 +367,5 @@ final class SlugManager
         $text = (string) preg_replace('~[^-\w]+~', '', $text);
         $text = (string) preg_replace('~' . preg_quote($divider, '~') . '+~', $divider, $text);
         return trim($text, $divider);
-    }
-
-    /**
-     * Generate a stable cache key for a given path.
-     *
-     * @param string $text The input text (usually a route path).
-     *
-     * @return string A string suitable as a cache key.
-     */
-    private function generateCacheKeyBy(string $text): string
-    {
-        return "wisymfony_slug_history.".md5($text);
     }
 }

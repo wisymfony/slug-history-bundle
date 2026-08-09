@@ -7,7 +7,7 @@ namespace Wisymfony\SlugHistoryBundle\EventListener;
 use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Event\PostUpdateEventArgs;
 use Doctrine\ORM\Event\PreUpdateEventArgs;
-use Wisymfony\SlugHistoryBundle\Service\SlugManager;
+use Wisymfony\SlugHistoryBundle\Service\Manager\SlugManager;
 
 /**
  * Doctrine event listener that detects slug changes on entities.
@@ -16,13 +16,13 @@ use Wisymfony\SlugHistoryBundle\Service\SlugManager;
  */
 final class DoctrineSlugListener
 {
-
     /**
      * Constructor.
      *
      * @param SlugManager $slugManager Service responsible for managing slug mappings.
      */
-    public function __construct(private SlugManager $slugManager){
+    public function __construct(private SlugManager $slugManager)
+    {
     }
 
     /**
@@ -35,11 +35,14 @@ final class DoctrineSlugListener
      *
      * @return void
      */
-    public function preUpdate(PreUpdateEventArgs $args) : void {
+    public function preUpdate(PreUpdateEventArgs $args): void
+    {
         $object = $args->getObject();
-        
-        if (!is_object($object)) return;
-        
+
+        if (!is_object($object)) {
+            return;
+        }
+
         $this->slugManager->applySlugged($object, $args->getEntityChangeSet());
     }
 
@@ -52,7 +55,8 @@ final class DoctrineSlugListener
      *
      * @return void
      */
-    public function postUpdate(PostUpdateEventArgs $args) : void {
+    public function postUpdate(PostUpdateEventArgs $args): void
+    {
         $this->slugManager->saveSlugUpdateList();
     }
 
@@ -69,9 +73,12 @@ final class DoctrineSlugListener
      *
      * @return void
      */
-    public function postPersist(PostPersistEventArgs $args) : void {
+    public function postPersist(PostPersistEventArgs $args): void
+    {
         $object = $args->getObject();
-        if (!is_object($object)) return;
+        if (!is_object($object)) {
+            return;
+        }
 
         // Persist any pending slug updates first
         $this->slugManager->saveSlugUpdateList();
