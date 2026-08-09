@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Wisymfony\SlugHistoryBundle\EventListener;
 
+use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Event\PostUpdateEventArgs;
 use Doctrine\ORM\Event\PreUpdateEventArgs;
 use Wisymfony\SlugHistoryBundle\Service\SlugManager;
@@ -53,5 +54,32 @@ final class DoctrineSlugListener
      */
     public function postUpdate(PostUpdateEventArgs $args) : void {
         $this->slugManager->saveSlugUpdateList();
+    }
+
+    /**
+     * Handle the `postPersist` Doctrine event.
+     *
+     * When a new row is inserted for an entity that exposes a slugged route,
+     * any existing redirect entries that point to this new path should be
+     * removed so the resource is reachable directly. This method computes the
+     * entity's current path(s) and asks `SlugManager` to remove them from the
+     * slug history cache after persisting.
+     *
+     * @param PostPersistEventArgs $args
+     *
+     * @return void
+     */
+    public function postPersist(PostPersistEventArgs $args) : void {
+        $object = $args->getObject();
+        if (!is_object($object)) return;
+
+        // Persist any pending slug updates first
+        $this->slugManager->saveSlugUpdateList();
+
+        // Compute the entity's current path(s) and remove any redirect entries
+        $paths = $this->slugManager->getPathsForEntity($object);
+        foreach ($paths as $path) {
+            $this->slugManager->removePath($path);
+        }
     }
 }

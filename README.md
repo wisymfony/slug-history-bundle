@@ -33,6 +33,7 @@ composer require wisymfony/slug-history-bundle
 ```
 
 ## Usage
+
 Add the #[Slugged] attribute to any Doctrine entity whose slug changes should be tracked:
 
 ```php
@@ -40,13 +41,12 @@ Add the #[Slugged] attribute to any Doctrine entity whose slug changes should be
 
 namespace App\Entity;
 
-use App\Repository\ArticleRepository;
+use App\Repository\ProductRepository;
 use Doctrine\ORM\Mapping as ORM;
-use WiSymfony\SlugHistoryBundle\Attribute\Slugged;
+use Wisymfony\SlugHistoryBundle\Attribute\Slugged;
 
-#[ORM\Entity(repositoryClass: ArticleRepository::class)]
-#[Slugged(routeName: 'app_article_show', slugProperty: 'slug', routeParamName: 'slug' )]
-class Article
+#[ORM\Entity(repositoryClass: ProductRepository::class)]
+class Product
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -54,23 +54,32 @@ class Article
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
-    private string $slug;
+    private string $title;
 
-    public function getId(): ?int
+    #[ORM\Column(length: 255)]
+    private ?string $slug = null;
+
+    private string $category = 'electronics';
+
+    #[Slugged(
+        from: 'title',
+        routeName: 'app_product_show',
+        routeSlugParam: 'slug',
+        routeDefaultParams: [
+            'category' => '@category',
+            'source' => 'legacy',
+        ]
+    )]
+    private ?string $slugField = null;
+
+    public function getSlugField(): ?string
     {
-        return $this->id;
+        return $this->slugField;
     }
 
-    public function getSlug(): string
+    public function getCategory(): string
     {
-        return $this->slug;
-    }
-
-    public function setSlug(string $slug): self
-    {
-        $this->slug = $slug;
-
-        return $this;
+        return $this->category;
     }
 }
 ```

@@ -1,0 +1,32 @@
+{% block slugged_widget %}
+    {% set prefix = id|split('_') %}
+    {% set prefix = prefix[0] %}
+
+    {% set slugRouteFormat = "" %}
+    {% if route.name is not empty %}
+        {% set slugRouteFormat = url(route.name, route.defaultParams|merge({(route.slugParam): '___SLUG__'})) %}
+    {% endif %}
+
+    {% set splitSlug = slugRouteFormat|split('___SLUG__') %}
+    {% set slugPrefix = splitSlug[0] %}
+    {% set suffix = splitSlug[1]|default('') %}
+
+    <label class="slugger-field" style="padding: 5px 10px;">
+        <span class="slug-prefix-url" data-prefix="{{slugPrefix}}"></span>
+        <input type="text" id="{{id}}" {{- block('widget_attributes') -}} name="{{ full_name }}" value="{{ value }}"/>
+        <span class="slug-suffix-url" data-suffix="{{suffix}}"></span>
+        {% if splitSlug is not empty %}
+            <a class="slug-preview-url" style="display: none" href="#" data-sformat="{{slugRouteFormat}}" target="_blank">{{showLabel|raw}}</a>
+        {% endif %}
+    </label>
+    
+    {% if not app.request.attributes.get('_slugged_slugged_included') %}
+        {% set version = constant('Wisymfony\\SlugHistoryBundle\\SlugHistoryBundle::VERSION') %}
+        <link rel="stylesheet" href="{{ asset('/bundles/slughistory/css/slugged-type.css' ~ '?v=' ~ version ) }}">
+        <script src="{{ asset('/bundles/slughistory/js/slugged-type.js') ~ '?v=' ~ version }}" defer></script>
+        {% do app.request.attributes.set('_slugged_slugged_included', true) %}
+    {% endif %}
+    <script defer>
+        window.addEventListener("load", () => new SluggedType("{{id}}", "{{prefix}}", {{from|json_encode|raw}}, {{mappingFrom|json_encode|raw}}));
+    </script>
+{% endblock %}

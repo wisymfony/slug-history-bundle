@@ -10,6 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Wisymfony\SlugHistoryBundle\Service\SlugManager;
 
 #[AsEventListener(event : KernelEvents::EXCEPTION, priority: 10)]
@@ -44,8 +45,9 @@ class ExceptionRedirectListener
         if (!$path || empty($path)) return;
         
         $newPath = $this->slugManager->getNewPath($path);
-        if ($newPath != $path) {
-            $event->setResponse(new RedirectResponse($newPath, Response::HTTP_MOVED_PERMANENTLY));
+        if (is_array($newPath) && isset($newPath['path']) && $newPath['path'] !== $path && str_starts_with($newPath['path'], '/')) {
+            $absoluteUrl = $event->getRequest()->getSchemeAndHttpHost() . $newPath['path'];
+            $event->setResponse(new RedirectResponse($absoluteUrl, Response::HTTP_MOVED_PERMANENTLY));
         }
     }
 }

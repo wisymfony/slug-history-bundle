@@ -21,6 +21,12 @@ final class SlugManager
 {
     private array $slugUpdateList = [];
     /**
+     * Cache of parsed `Slugged` attribute metadata per class to avoid repeated reflection.
+     *
+     * @var array<string, array<int, array{name:string,attr:Slugged}>>
+     */
+    private array $sluggedCache = [];
+    /**
      * Constructor.
      *
      * @param CacheInterface  $cacheInterface Cache used to store slug mappings.
@@ -28,6 +34,10 @@ final class SlugManager
      */
     public function __construct(private CacheInterface $cacheInterface, private RouterInterface $routerInterface)
     {
+    }
+
+    public function getRouterInterface() : RouterInterface {
+        return $this->routerInterface;
     }
 
     /**
@@ -48,7 +58,8 @@ final class SlugManager
         foreach ($sluggers as $slugger) {
             if ($slugger['attr'] instanceof Slugged) {
                 $attr = $slugger['attr'];
-                $oldSlug = $this->getFieldValue($object, $slugger['name']);
+                
+                $oldSlug = $this->getFieldValueString($object, $slugger['name']);
                 if (
                     !empty($attr->from) &&
                     isset($entityChangeSet[$attr->from]) &&
@@ -58,12 +69,13 @@ final class SlugManager
                     $this->updateSlugField($object, $slugger['name'], $fromValue);
                 }
 
-                $newSlug = $this->getFieldValue($object, $slugger['name']);
+                $newSlug = $this->getFieldValueString($object, $slugger['name']);
                 if (isset($entityChangeSet[$slugger['name']])) {
+                    $oldSlug = $entityChangeSet[$slugger['name']][0];
                     $newSlug = $entityChangeSet[$slugger['name']][1];
                 }
 
-                if ($newSlug != $oldSlug && !empty($attr->routeName)) {
+                if (!empty($attr->routeName)) {
                     $oldRouteParams = [];
                     $newRouteParams = [];
                     if (!empty($attr->routeSlugParam)) {
@@ -75,9 +87,17 @@ final class SlugManager
                         $newRouteParams = array_merge($newRouteParams, $attr->routeDefaultParams);
                     }
 
-                    $oldPath = $this->routerInterface->generate($attr->routeName, $oldRouteParams, RouterInterface::ABSOLUTE_PATH);
-                    $newPath = $this->routerInterface->generate($attr->routeName, $newRouteParams, RouterInterface::ABSOLUTE_PATH);
-                    $this->slugUpdateList[$oldPath] = $newPath;
+                    $oldPath = $this->routerInterface->generate($attr->routeName, $this->applyMapperRouteParams($object, $oldRouteParams));
+                    $newPath = $this->routerInterface->generate($attr->routeName, $this->applyMapperRouteParams($object, $newRouteParams));
+                    if ($oldPath != $newPath) {
+                        $this->slugUpdateList[$oldPath] = [
+                            'path' => $newPath,
+                            'entityClass' => get_class($object),
+                            'entityId' => method_exists($object, 'getId') ? $object->getId() : null,
+                            'createdAt' => time(),
+                            'oldPath' => $oldPath,
+                        ];
+                    }
                 }
             }
         }
@@ -95,13 +115,10 @@ final class SlugManager
     public function saveSlugUpdateList(): void
     {
         if (!empty($this->slugUpdateList)) {
-            foreach ($this->slugUpdateList as $oldPath => $newPath) {
+            foreach ($this->slugUpdateList as $oldPath => $newPathData) {
                 $cacheKey = $this->generateCacheKeyBy($oldPath);
-
                 $this->cacheInterface->delete($cacheKey);
-                $this->cacheInterface->delete($this->generateCacheKeyBy($newPath));
-
-                $this->cacheInterface->get($cacheKey, fn () => $newPath);
+                $this->cacheInterface->get($cacheKey, fn () => $newPathData);
             }
             $this->slugUpdateList = [];
         }
@@ -112,11 +129,150 @@ final class SlugManager
      *
      * @param string $oldPath The requested old path to resolve (e.g. `/blog/old-slug`).
      *
-     * @return string|null The resolved current path if found in cache, or null when not found.
+     * @return array|null The resolved current path if found in cache, or null when not found.
      */
-    public function getNewPath(String $oldPath): null|string
+    public function getNewPath(string $oldPath): ?array
     {
-        return $this->cacheInterface->get($this->generateCacheKeyBy($oldPath), fn () => null);
+        $visited = [];
+        $currentPath = $oldPath;
+        $bestMatch = null;
+
+        while ($currentPath !== null && !isset($visited[$currentPath])) {
+            $visited[$currentPath] = true;
+            $entry = $this->readCacheEntry($currentPath);
+
+            if (!is_array($entry) || !isset($entry['path']) || !is_string($entry['path'])) {
+                break;
+            }
+
+            $entryCreatedAt = isset($entry['createdAt']) ? (int) $entry['createdAt'] : 0;
+            if ($bestMatch === null || $entryCreatedAt > $bestMatch['createdAt']) {
+                $bestMatch = [
+                    'path' => $entry['path'],
+                    'createdAt' => $entryCreatedAt,
+                    'entityClass' => $entry['entityClass'] ?? null,
+                    'entityId' => $entry['entityId'] ?? null,
+                ];
+            }
+
+            if ($entry['path'] === $currentPath) {
+                break;
+            }
+
+            $currentPath = $entry['path'];
+        }
+
+        return $bestMatch;
+    }
+
+    /**
+     * Generate the current route path(s) for an entity based on its `Slugged` attributes.
+     *
+     * Returns an array of absolute paths (strings). Useful for callers that need
+     * to know the concrete path(s) an entity will occupy (for example to remove
+     * any existing redirect entries when a new row is persisted).
+     *
+     * @param object $object The entity instance to inspect.
+     *
+     * @return string[] Array of absolute paths for the entity's slugged routes.
+     */
+    public function getPathsForEntity(object $object): array
+    {
+        $paths = [];
+        $sluggers = $this->getSlugged($object);
+        foreach ($sluggers as $slugger) {
+            if ($slugger['attr'] instanceof Slugged) {
+                $attr = $slugger['attr'];
+                if (empty($attr->routeName)) {
+                    continue;
+                }
+
+                $routeParams = [];
+                $value = $this->getFieldValueString($object, $slugger['name']);
+                if (!empty($attr->routeSlugParam) && $value !== null) {
+                    $routeParams[$attr->routeSlugParam] = $value;
+                }
+                if (!empty($attr->routeDefaultParams)) {
+                    $routeParams = array_merge($routeParams, $attr->routeDefaultParams);
+                }
+
+                $routeParams = $this->applyMapperRouteParams($object, $routeParams);
+                $paths[] = $this->routerInterface->generate($attr->routeName, $routeParams);
+            }
+        }
+
+        return $paths;
+    }
+
+    /**
+     * Remove a saved slug path from cache and rewire its immediate predecessor.
+     *
+     * Behaviour:
+     * - Reads the cache entry for `$path`. If the entry exists and contains a
+     *   `'path'` value (the successor), and also contains an `'oldPath'` value,
+     *   then the method will load the cache entry for that `oldPath` and,
+     *   if it currently points to `$path`, update it to point to the successor.
+     * - Finally the cache entry for `$path` itself is removed.
+     *
+     * Notes / limitations:
+     * - This rewiring only updates a single predecessor stored in the
+     *   `'oldPath'` field of the removed entry; it doesn't traverse or rebuild
+     *   full predecessor lists or reverse-indexes.
+     * - Cache keys are generated using `generateCacheKeyBy()`; callers that
+     *   maintain additional reverse indices must keep them in sync separately.
+     *
+     * @param string $path Absolute route path to remove from slug history.
+     */
+    public function removePath(string $path) : void {
+        $pathData = $this->readCacheEntry($path);
+        if (is_array($pathData) && isset($pathData['path'])) {
+            $pathFinal = $pathData['path'];
+            if (isset($pathData['oldPath']) && !empty($pathData['oldPath'])) {
+                $oldPathData = $this->readCacheEntry($pathData['oldPath']);
+                if (isset($oldPathData['path']) && $oldPathData['path'] === $path) {
+                    $oldPathData['path'] = $pathFinal;
+                    $cacheKeyOld = $this->generateCacheKeyBy($pathData['oldPath']);
+                    $this->cacheInterface->delete($cacheKeyOld);
+                    $this->cacheInterface->get($cacheKeyOld, fn () => $oldPathData);
+                }
+            }
+        }
+
+        $cacheKey = $this->generateCacheKeyBy($path);
+        $this->cacheInterface->delete($cacheKey);
+    }
+
+    private function applyMapperRouteParams(object $object, array $routeParams): array
+    {
+        $result = [];
+        foreach ($routeParams as $key => $value) {
+            $fieldValue = $value;
+            if (is_string($value) && str_starts_with($value, '@')) {
+                $fieldPath = explode('.', substr($value, 1));
+                foreach ($fieldPath as $index => $fieldName) {
+                    if ($index === 0) {
+                        $fieldValue = $this->getFieldValue($object, $fieldName);
+                    } else {
+                        if (is_object($fieldValue)) {
+                            $fieldValue = $this->getFieldValue($fieldValue, $fieldName);
+                        } else {
+                            $fieldValue = null;
+                            break;
+                        }
+                    }
+                }
+            }
+            $result[$key] = $fieldValue;
+        }
+        return $result;
+    }
+
+    private function readCacheEntry(string $path): ?array
+    {
+        $cacheKey = $this->generateCacheKeyBy($path);
+        $payload = $this->cacheInterface->get($cacheKey, fn () => null);
+
+        return is_array($payload) ? $payload : null;
     }
 
     /**
@@ -127,15 +283,22 @@ final class SlugManager
      *
      * @return string|null The value returned by the getter, or null if not available.
      */
-    private function getFieldValue(object $object, string $fieldName): String
+    private function getFieldValueString(object $object, string $fieldName): ?string
+    {
+        $value = $this->getFieldValue($object, $fieldName);
+        return is_string($value) ? $value : null;
+    }
+
+    private function getFieldValue(object $object, string $fieldName): mixed
     {
         $methodGetSlug = sprintf("get%s", ucfirst($fieldName));
-        $value = null;
         if (method_exists($object, $methodGetSlug)) {
-            $value = $object->{$methodGetSlug}();
+            return $object->{$methodGetSlug}();
         }
-        return $value;
+        return null;
     }
+
+
 
     /**
      * Inspect the object with reflection and return properties annotated with `Slugged`.
@@ -146,6 +309,11 @@ final class SlugManager
      */
     private function getSlugged(object $object): array
     {
+        $class = get_class($object);
+        if (isset($this->sluggedCache[$class])) {
+            return $this->sluggedCache[$class];
+        }
+
         $slugged = [];
         $reflection = new ReflectionClass($object);
         foreach ($reflection->getProperties() as $reflectionProperty) {
@@ -157,9 +325,11 @@ final class SlugManager
                 ];
             }
         }
+
+        $this->sluggedCache[$class] = $slugged;
         return $slugged;
     }
-    
+
     /**
      * Update the slug field on the object by generating a slug from another value.
      *
@@ -169,7 +339,7 @@ final class SlugManager
      *
      * @return void
      */
-    private function updateSlugField(object &$object, string $slugField, String $fromValue): void
+    private function updateSlugField(object &$object, string $slugField, string $fromValue): void
     {
         if (!empty($fromValue)) {
             $methodSetSlugValue = sprintf("set%s", ucfirst($slugField));

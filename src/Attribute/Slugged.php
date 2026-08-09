@@ -18,9 +18,9 @@ use Attribute;
 final class Slugged
 {
     public function __construct(
-        public String|null $from = null,
-        public String|null $routeName = null,
-        public String|null $routeSlugParam = "slug",
+        public string|null $from = null,
+        public string|null $routeName = null,
+        public string|null $routeSlugParam = "slug",
         public array $routeDefaultParams = [],
     ) {
     }
