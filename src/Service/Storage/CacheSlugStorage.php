@@ -1,5 +1,5 @@
 <?php
-
+declare(strict_types=1);
 namespace Wisymfony\SlugHistoryBundle\Service\Storage;
 
 use Symfony\Contracts\Cache\CacheInterface;

@@ -87,13 +87,9 @@ final class SlugManager
                 if (!empty($attr->routeName)) {
                     $oldRouteParams = [];
                     $newRouteParams = [];
-                    if (!empty($attr->routeSlugParam)) {
-                        $oldRouteParams[$attr->routeSlugParam] = $oldSlug;
-                        $newRouteParams[$attr->routeSlugParam] = $newSlug;
-                    }
-                    if (!empty($attr->routeDefaultParams)) {
-                        $oldRouteParams = array_merge($oldRouteParams, $attr->routeDefaultParams);
-                        $newRouteParams = array_merge($newRouteParams, $attr->routeDefaultParams);
+                    if (!empty($attr->routeParams)) {
+                        $oldRouteParams = array_merge($oldRouteParams, $attr->routeParams);
+                        $newRouteParams = array_merge($newRouteParams, $attr->routeParams);
                     }
 
                     $oldRouteParams = $this->applyMapperRouteParams($object, $oldRouteParams, $entityChangeSet);
@@ -105,8 +101,7 @@ final class SlugManager
                         $this->slugUpdateList[$oldPath] = [
                             'path' => $newPath,
                             'entityClass' => get_class($object),
-                            'entityId' => method_exists($object, 'getId') ? $object->getId() : null,
-                            'createdAt' => time(),
+                            'lastUpdatedAt' => time(),
                             'oldPath' => $oldPath,
                         ];
                     }
@@ -155,13 +150,12 @@ final class SlugManager
                 break;
             }
 
-            $entryCreatedAt = isset($entry['createdAt']) ? (int) $entry['createdAt'] : 0;
-            if ($bestMatch === null || $entryCreatedAt > $bestMatch['createdAt']) {
+            $entryCreatedAt = isset($entry['lastUpdatedAt']) ? (int) $entry['lastUpdatedAt'] : 0;
+            if ($bestMatch === null || $entryCreatedAt > $bestMatch['lastUpdatedAt']) {
                 $bestMatch = [
                     'path' => $entry['path'],
-                    'createdAt' => $entryCreatedAt,
-                    'entityClass' => $entry['entityClass'] ?? null,
-                    'entityId' => $entry['entityId'] ?? null,
+                    'lastUpdatedAt' => $entryCreatedAt,
+                    'entityClass' => $entry['entityClass'] ?? null
                 ];
             }
 
@@ -198,12 +192,8 @@ final class SlugManager
                 }
 
                 $routeParams = [];
-                $value = $this->getFieldValueString($object, $slugger['name']);
-                if (!empty($attr->routeSlugParam) && $value !== null) {
-                    $routeParams[$attr->routeSlugParam] = $value;
-                }
-                if (!empty($attr->routeDefaultParams)) {
-                    $routeParams = array_merge($routeParams, $attr->routeDefaultParams);
+                if (!empty($attr->routeParams)) {
+                    $routeParams = array_merge($routeParams, $attr->routeParams);
                 }
 
                 $routeParams = $this->applyMapperRouteParams($object, $routeParams);

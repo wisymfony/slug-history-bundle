@@ -4,7 +4,7 @@
 
     {% set slugRouteFormat = "" %}
     {% if route.name is not empty %}
-        {% set slugRouteFormat = url(route.name, route.defaultParams|merge({(route.slugParam): '___SLUG__'})) %}
+        {% set slugRouteFormat = url(route.name, params|merge({(route.slugParam): '___SLUG__'})) %}
     {% endif %}
 
     {% set splitSlug = slugRouteFormat|split('___SLUG__') %}
@@ -23,10 +23,10 @@
     {% if not app.request.attributes.get('_slugged_slugged_included') %}
         {% set version = constant('Wisymfony\\SlugHistoryBundle\\SlugHistoryBundle::VERSION') %}
         <link rel="stylesheet" href="{{ asset('/bundles/slughistory/css/slugged-type.css' ~ '?v=' ~ version ) }}">
-        <script src="{{ asset('/bundles/slughistory/js/slugged-type.js') ~ '?v=' ~ version }}" defer></script>
+        <script src="{{ asset('/bundles/slughistory/js/slugged-type.min.js') ~ '?v=' ~ version }}" defer></script>
         {% do app.request.attributes.set('_slugged_slugged_included', true) %}
     {% endif %}
     <script defer>
-        window.addEventListener("load", () => new SluggedType("{{id}}", "{{prefix}}", {{from|json_encode|raw}}, {{mappingFrom|json_encode|raw}}));
+        window.addEventListener("load", () => new SluggedType("{{id}}", "{{prefix}}", "{{from}}", {{mappingFrom|json_encode|raw}}));
     </script>
 {% endblock %}

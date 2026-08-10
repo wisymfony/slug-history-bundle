@@ -14,18 +14,19 @@ class SluggedType extends AbstractType
             "route" => [
                 'name' => '',
                 'slugParam' => '',
-                'defaultParams' => [],
-                'mappingFrom' => []
+                'params' => []
             ],
-            "from" => [],
+            "from" => '',
             'showLabel' => 'Visit &#10138;',
         ]);
     }
 
     public function buildView(\Symfony\Component\Form\FormView $view, \Symfony\Component\Form\FormInterface $form, array $options): void
     {
-        if (isset($options['from']) && !is_array($options['from'])) {
-            throw new \InvalidArgumentException("The 'from' option must be an array of field names.");
+        $options = array_merge(['from' => ''], $options);
+        
+        if (!is_string($options['from'])) {
+            throw new \InvalidArgumentException("The 'from' option must be an string of field name.");
         }
 
         $route = $options['route'];
@@ -33,37 +34,39 @@ class SluggedType extends AbstractType
             throw new \InvalidArgumentException("The 'route' option must be an array with 'name' and 'slugParam' keys.");
         }
 
-        if (!isset($route['mappingFrom'])) {
-            $route['mappingFrom'] = [];
+        if (!isset($route['params'])) {
+            $route['params'] = [];
         }
 
-        if (!is_array($route['mappingFrom'])) {
-            throw new \InvalidArgumentException("The 'mappingFrom' option must be an array.");
+        if (!is_array($route['params'])) {
+            throw new \InvalidArgumentException("The 'params' key in 'route' option must be an array.");
         }
 
-        if (!is_string($route['name']) || !is_string($route['slugParam'])) {
-            throw new \InvalidArgumentException("The 'name' and 'slugParam' keys in the 'route' option must be strings.");
+        if (!is_string($route['name'])) {
+            throw new \InvalidArgumentException("The 'name' key in the 'route' option must be strings.");
         }
 
-        if (!isset($route['defaultParams'])) {
-            $route['defaultParams'] = [];
+        if (!empty($route['slugParam']) && isset($route['params'][$route['slugParam']])) {
+            unset($route['params'][$route['slugParam']]);
         }
 
-        if (!is_array($route['defaultParams'])) {
-            throw new \InvalidArgumentException("The 'defaultParams' option must be an array.");
-        }
-        foreach ($route['mappingFrom'] as $key => $value) {
+        $mappingFrom = [];
+        foreach ($route['params'] as $key => $value) {
             if (is_string($key) && is_string($value)) {
-                $mappingValue = sprintf("__%s__", strtoupper($value));
-                $route['defaultParams'][$key] = $mappingValue;
-                $route['mappingFrom'][$key] = $mappingValue;
+                if (str_starts_with($value, '@')) {
+                    $migrationKey = substr($value, 1);
+                    $value = sprintf("__%s__", strtoupper($migrationKey));
+                    $mappingFrom[$migrationKey] = $value;
+                }
+                $route['params'][$key] = $value;
             }
         }
 
         $view->vars['from'] = $options['from'];
         $view->vars['showLabel'] = $options['showLabel'];
         $view->vars['route'] = $route;
-        $view->vars['mappingFrom'] = $route['mappingFrom'];
+        $view->vars['params'] = $route['params'];
+        $view->vars['mappingFrom'] = $mappingFrom;
     }
 
     public function getParent(): string

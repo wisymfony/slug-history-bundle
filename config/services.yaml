@@ -31,3 +31,5 @@ services:
         autoconfigure: true
         arguments:
             $em: '@doctrine.orm.entity_manager'
+
+    Wisymfony\SlugHistoryBundle\Service\Manager\SlugManager: ~
