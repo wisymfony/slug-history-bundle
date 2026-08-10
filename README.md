@@ -1,4 +1,4 @@
-# Slug History Bundle — (Updated)
+# Slug History Bundle
 
 This document summarizes the recent changes in the bundle and shows how to use the new/updated APIs.
 
