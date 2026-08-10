@@ -1,41 +1,52 @@
 # Slug History Bundle
 
-This document summarizes the recent changes in the bundle and shows how to use the new/updated APIs.
+This document summarizes the bundle's features and shows how to use the APIs.
 
 ## Overview
 
-The bundle tracks slug changes on Doctrine entities and redirects old URLs to the current route using `301 Moved Permanently`.
+The bundle tracks slug changes on Doctrine entities and automatically redirects old URLs to the current route using `301 Moved Permanently`, preserving SEO when entities' slugs change.
 
-Main components:
-- `DoctrineSlugListener` — detects slug changes on entities.
-- `SlugManager` — builds old→new mappings and persists them to the configured storage.
-- `SlugStorageInterface` — storage abstraction for slug mappings.
-- `CacheSlugStorage` — cache-backed implementation (default).
-- `DatabaseSlugStorage` — database-backed implementation (now implemented; requires migration/entity).
-- `ExceptionRedirectListener` — resolves old paths and issues `301` redirects.
+### Main components
+
+- **`DoctrineSlugListener`** — detects slug changes on entities during lifecycle events (`preUpdate`, `postUpdate`, `postPersist`).
+- **`SlugManager`** — calculates old→new path mappings and persists them to configured storage.
+- **`SlugStorageInterface`** — storage abstraction for slug mappings.
+- **`CacheSlugStorage`** — cache-backed implementation (default, no database required).
+- **`DatabaseSlugStorage`** — database-backed implementation using Doctrine (requires migration).
+- **`ExceptionRedirectListener`** — intercepts 404 errors, resolves old paths, and issues `301` redirects.
 
 ---
 
-## Diagram
+## Flow diagram
 
 <picture>
   <source srcset="assets/logo-dark-mode.svg" media="(prefers-color-scheme: dark)">
   <img src="assets/logo-light-mode.svg" alt="SlugHistory flow diagram" style="max-width:100%;height:auto">
 </picture>
 
-Caption: `DoctrineSlugListener` → `SlugManager` → `SlugStorageInterface` → `ExceptionRedirectListener` (301 redirect).
+**Flow:** `DoctrineSlugListener` → `SlugManager` → `SlugStorageInterface` → `ExceptionRedirectListener` (issues `301` redirect).
 
 ---
 
 ## Installation
 
-Install with Composer:
+Install the bundle with Composer:
 
 ```bash
 composer require wisymfony/slug-history-bundle
 ```
 
-The bundle supports automatic registration (Symfony Flex). If your app doesn't auto-register bundles, see Manual activation below.
+The bundle supports automatic registration via Symfony Flex. If your app doesn't auto-register bundles, see [Manual activation](#manual-bundle-activation).
+
+---
+
+## Manual bundle activation
+
+If auto-registration is disabled, enable the bundle in `config/bundles.php`:
+
+```php
+Wisymfony\SlugHistoryBundle\SlugHistoryBundle::class => ['all' => true],
+```
 
 ---
 
@@ -64,30 +75,32 @@ class Product
 }
 ```
 
-Notes:
-- Values in `routeParams` starting with `@` (for example `@category`) map to the entity object properties: the bundle resolves `@category` by calling `getCategory()` on the entity (dot-notation supported for nested objects, e.g. `@owner.email`).
-- `from` can be used to auto-generate/update the slug from another field when the slug field itself is not changed directly.
-
+**Key notes:**
+- Values in `routeParams` starting with `@` (e.g., `@category`) are resolved from entity properties by calling their getter methods (e.g., `getCategory()`).
+- Dot-notation is supported for nested objects: `@owner.company.name` resolves to `getOwner()->getCompany()->getName()`.
+- `from` specifies a source field used to auto-generate/update the slug when the slug field itself is not changed directly.
 
 ---
 
-## `#[Slugged]` options (role-prefixed)
+## `#[Slugged]` attribute options
 
 | Option | Type | Default | Description |
 |---|---:|---|---|
-| `from` | `string|null` | `null` | Role: source field used to derive the slug value. If the slug property is not updated directly, the value from `from` will be used to regenerate the slug. |
-| `routeName` | `string|null` | `null` | Role: route selector. Symfony route name used to generate the old/new path URLs. Route parameters with `@` are resolved from the entity/form. |
-| `routeParams` | `array` | `[]` | Role: default route parameters. Additional route parameters for URL generation. Values starting with `@` are resolved from the entity/form (e.g. `"category": "@category"`). |
+| `from` | `string\|null` | `null` | Source field name used to derive the slug value. If the slug property is not updated directly, the value from `from` will be used to regenerate the slug. |
+| `routeName` | `string\|null` | `null` | Symfony route name used to generate the old and new path URLs. Route parameters with `@` are resolved from the entity. |
+| `routeParams` | `array` | `[]` | Additional route parameters for URL generation. Values starting with `@` are resolved from the entity (e.g., `"category": "@category"`). Supports dot-notation for nested objects. |
 
 ---
 
 ### 2) Use `SluggedType` in a form
 
-`SluggedType` renders a slug input with a preview link. The widget accepts a `route` array and `from` field.
+`SluggedType` renders a slug input field with a live preview link. The widget accepts a route configuration and source field mapping.
 
-Example (form builder):
+**Example (form builder):**
 
 ```php
+use Wisymfony\SlugHistoryBundle\Form\Type\SluggedType;
+
 $builder->add('slug', SluggedType::class, [
     'route' => [
         'name' => 'app_product_show',
@@ -99,110 +112,198 @@ $builder->add('slug', SluggedType::class, [
         ]
     ],
     'from' => 'title',
-    'showLabel' => 'Voir la page',
+    'showLabel' => 'View the page',
 ]);
 ```
 
-Important behavior:
-- Any `route.*` value that begins with `@` is resolved against the form's underlying object (entity) at render time.
-- `SluggedType` transforms `@field` tokens into placeholders in the preview and provides a `mappingFrom` structure to the client-side widget so it can display the current values.
+**Behavior:**
+- Any `route.params` value beginning with `@` is resolved against the form's underlying entity at render time.
+- `SluggedType` replaces `@field` tokens with their actual values and builds a `mappingFrom` array to track field dependencies for the client-side preview widget to update dynamically.
 
 ---
 
-## `SluggedType` options (role-prefixed)
+## `SluggedType` form type options
 
 | Option | Type | Default | Description |
 |---|---:|---|---|
-| `route` | `array` | `['name'=>'','slugParam'=>'','params'=>[]]` | Role: route preview configuration. Used to build the preview URL and placeholders. Values starting with `@` map to entity/form properties. |
-| `route.name` | `string` | `''` | Role: preview route name. |
-| `route.slugParam` | `string` | `''` | Role: slug parameter in route. |
-| `route.params` | `array` | `[]` | Role: default preview parameters. Values beginning with `@` map to form properties. |
-| `from` | `array` | `[]` | Role: preview source fields. List of form fields used to compute placeholder values. |
-| `showLabel` | `string` | `'Visit →'` | Role: UI label for the preview link. |
+| `route` | `array` | `['name' => '', 'slugParam' => '', 'params' => []]` | Route configuration for URL preview. Values starting with `@` map to entity/form properties. |
+| `route.name` | `string` | `''` | Symfony route name for the preview URL. |
+| `route.slugParam` | `string` | `''` | The route parameter name that holds the slug (e.g., `'slug'`). |
+| `route.params` | `array` | `[]` | Default parameters for URL preview. Values beginning with `@` map to entity properties and support dot-notation. |
+| `from` | `array` | `[]` | Form field names used to compute preview placeholder values. |
+| `showLabel` | `string` | `'Visit →'` | UI label for the preview link button. |
 
 ---
 
 ## Storage backends
 
-The bundle uses `SlugStorageInterface` for storing slug mappings. Implementations provided:
+The bundle uses `SlugStorageInterface` to persist slug mappings. Two implementations are provided:
 
-- `CacheSlugStorage` — stores mappings in a Symfony cache pool (default and recommended). No DB migration required.
-- `DatabaseSlugStorage` — database-backed implementation persisted via Doctrine. The implementation now includes basic CRUD using a `WiSymfonySlugHistory` entity and `WiSymfonySlugHistoryRepository`. You must add the entity/migration to your project to use DB storage (see below).
+| Backend | Storage | Performance | Use Case |
+|---------|---------|-------------|----------|
+| `CacheSlugStorage` | Symfony cache pool | Fast (in-memory) | Default; recommended for most apps |
+| `DatabaseSlugStorage` | Doctrine ORM | Persistent | Multi-server setups or audit trail requirements |
 
-Switch backend options (three methods):
+### Configuration
 
-1) Environment variable + service alias (recommended): set `WISYFONY_SLUG_HISTORY_STORAGE=cache|database` in `.env` and alias `SlugStorageInterface` accordingly in `config/services.php`.
+Choose your backend using **one** of these methods:
 
-2) Parameter in `config/services.yaml`: set `wisymfony_slug_history.storage: 'cache'` and alias `SlugStorageInterface` to chosen implementation.
+#### Method 1: Environment variable (recommended)
 
-3) Overriding Service Configuration
+Set `WISYMFONY_SLUG_HISTORY_STORAGE` in your `.env` file:
 
-You can directly override service arguments within your main application's configuration file (`config/services.yaml`).
+```bash
+# .env or .env.local
+WISYMFONY_SLUG_HISTORY_STORAGE=cache
+```
+
+Then alias `SlugStorageInterface` in `config/services.php`:
+
+```php
+use Wisymfony\SlugHistoryBundle\Service\Storage\SlugStorageInterface;
+use Wisymfony\SlugHistoryBundle\Service\Storage\CacheSlugStorage;
+
+$services->alias(SlugStorageInterface::class, CacheSlugStorage::class);
+```
+
+#### Method 2: Service parameter in `config/services.yaml`
+
+```yaml
+parameters:
+    wisymfony_slug_history.storage: 'cache'  # or 'database'
+```
+
+#### Method 3: Direct service override in `config/services.yaml`
 
 ```yaml
 services:
-    App\Service\MyCustomSlugStorage: # <- must implements Wisymfony\SlugHistoryBundle\Service\Storage\SlugStorageInterface
+    App\Service\MyCustomSlugStorage:
         arguments: ['@my_storage_dependency']
 
     Wisymfony\SlugHistoryBundle\Service\Manager\SlugManager:
         arguments:
-            $storageInterface : App\Service\MyCustomSlugStorage
+            $storageInterface: '@App\Service\MyCustomSlugStorage'
 ```
 
 ---
 
-### Database storage setup
+## Using DatabaseSlugStorage
 
-If you choose `database` storage, the bundle references a `WiSymfonySlugHistory` entity. Ensure you add the entity and create a migration with Doctrine. A minimal table should store:
+To use database-backed storage, the bundle provides a `WiSymfonySlugHistory` entity. Follow these steps:
 
-- `id` (PK)
-- `old_path` (string)
-- `old_path_key` (string, md5 of old_path) — used for fast lookup
-- `new_path` (string)
-- `entity_class` (string, nullable)
-- `last_updated_at` (datetime)
+### Step 1: Verify the entity exists
 
-Generate and run a migration for the added entity before switching the storage alias to `DatabaseSlugStorage`.
+The entity is included in the bundle at `src/Entity/WiSymfonySlugHistory.php`. It stores:
 
----
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | UUID or int | Primary key |
+| `old_path` | string (2048) | The original URL path |
+| `old_path_key` | string (32) | MD5 hash of `old_path` for fast lookup |
+| `new_path` | string (2048) | The current URL path |
+| `entity_class` | string, nullable | FQCN of the origin entity class |
+| `created_at` | datetime | When the mapping was created |
+| `last_updated_at` | datetime | When the mapping was last updated |
 
-## Manual bundle activation
+### Step 2: Create and run the migration
 
-If auto-registration is disabled, enable the bundle in `config/bundles.php`:
+Generate a migration to create the table:
+
+```bash
+php bin/console make:migration
+php bin/console doctrine:migrations:migrate
+```
+
+### Step 3: Switch the storage alias
+
+Update `config/services.php` to use `DatabaseSlugStorage`:
 
 ```php
-Wisymfony\SlugHistoryBundle\SlugHistoryBundle::class => ['all' => true],
+use Wisymfony\SlugHistoryBundle\Service\Storage\SlugStorageInterface;
+use Wisymfony\SlugHistoryBundle\Service\Storage\DatabaseSlugStorage;
+
+$services->alias(SlugStorageInterface::class, DatabaseSlugStorage::class);
+```
+
+Alternatively, set the environment variable:
+
+```bash
+WISYMFONY_SLUG_HISTORY_STORAGE=database
 ```
 
 ---
 
-## How lookups work
+## How slug lookups and redirects work
 
-- When a `NotFoundHttpException` occurs, `ExceptionRedirectListener` calls `SlugManager::getNewPath($requestedPath)`.
-- `SlugManager` uses the configured `SlugStorageInterface` to `findPath()` and may follow chained redirects until the current target is found.
+When a user requests a URL that no longer exists (HTTP 404):
+
+1. **`ExceptionRedirectListener`** intercepts the `NotFoundHttpException`.
+2. Calls **`SlugManager::getNewPath($oldRequestPath)`** to look up the mapping.
+3. `SlugManager` queries the configured **`SlugStorageInterface`** using `findPath()`.
+4. If a mapping is found, returns the new path. If the new path itself has an old mapping, the lookup follows the chain until the current target is found.
+5. **Issues a `301 Moved Permanently`** redirect to the current route.
 
 ---
 
-## Example: route param mapping
+## Route parameter mapping with dot-notation
 
-When you configure `routeParams` like:
+The bundle resolves `@`-prefixed tokens in `routeParams` by calling getter methods on the entity. Nested properties use dot-notation:
+
+**Example entity:**
 
 ```php
-'routeParams' => [
-    'slug' => '@slug',
-    'category' => '@category',
-]
+class Product
+{
+    private Company $company;
+    private string $slug;
+
+    public function getCompany(): Company { return $this->company; }
+    public function getSlug(): string { return $this->slug; }
+}
+
+class Company
+{
+    private string $name;
+
+    public function getName(): string { return $this->name; }
+}
 ```
 
-The bundle resolves `@slug` by calling `getSlug()` and `@category` by calling `getCategory()` on the entity. If the token includes a dot (`@owner.email`) the bundle will resolve nested getters (`getOwner()->getEmail()`). If a property is present in the Doctrine change set during `preUpdate`, the change set value is preferred for generating the _old_ value.
+**Attribute configuration:**
+
+```php
+#[Slugged(
+    routeParams: [
+        'company' => '@company.name',      // resolves getCompany()->getName()
+        'slug' => '@slug',                 // resolves getSlug()
+    ],
+    routeName: 'app_product_show',
+)]
+private ?string $slugField = null;
+```
+
+**Generated URL:** `/products/{company}/{slug}` → `/products/acme/my-product`
 
 ---
 
-## Notes & Next steps
+## Key features
 
-- I verified the files you listed. `SlugManager` now depends on `SlugStorageInterface` and resolves `@`-prefixed route params using `getFieldValue` and supports nested dot-notation. `SluggedType` prepares a `mappingFrom` array for the client widget and replaces `@field` tokens with placeholders. `DatabaseSlugStorage` now contains persistence logic and expects a `WiSymfonySlugHistory` entity/repository — you must add the entity migration to use it.
+- ✅ Automatic 301 redirects preserve SEO when slugs change
+- ✅ Pluggable storage (cache or database)
+- ✅ Support for derived slugs (`from` field)
+- ✅ Dot-notation for nested entity properties
+- ✅ Form widget with live URL preview
+- ✅ Multi-server friendly with database backend
+- ✅ Compatible with Symfony 6.4, 7.x, and 8.x
 
-- Would you like me to generate a Doctrine entity (`WiSymfonySlugHistory`) and a sample migration file to go with `DatabaseSlugStorage`? I can scaffold the entity and a migration (SQL) in the bundle or provide a ready-to-copy entity for your app.
+---
+
+## Notes & best practices
+
+- **Cache vs. Database:** Use `CacheSlugStorage` for single-server apps (faster, no DB overhead). Use `DatabaseSlugStorage` for distributed systems or when you need a persistent audit trail.
+- **Slug preview in forms:** The `SluggedType` widget updates the preview URL in real-time as users edit the form. Ensure `from` field names match your entity properties.
+- **Chained redirects:** The bundle automatically resolves chains of old redirects. If slug A → B → C, requesting A will be redirected directly to C.
+- **Performance:** `old_path_key` (MD5 hash) is indexed for fast lookups on large datasets.
 
 ---
 

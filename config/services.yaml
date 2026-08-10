@@ -1,6 +1,6 @@
 parameters:
-    env(WISYFONY_SLUG_HISTORY_STORAGE): 'CACHE'
-    wisymfony_slug_history.storage: '%env(WISYFONY_SLUG_HISTORY_STORAGE)%'
+    env(WISYMFONY_SLUG_HISTORY_STORAGE): 'CACHE'
+    wisymfony_slug_history.storage: '%env(WISYMFONY_SLUG_HISTORY_STORAGE)%'
 
 services:
     _defaults:
