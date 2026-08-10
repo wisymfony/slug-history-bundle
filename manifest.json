@@ -1,0 +1,8 @@
+{
+    "env": {
+        "WISYFONY_SLUG_HISTORY_STORAGE": "CACHE"
+    },
+    "aliases": [
+        "wisymfony-slug-bundle"
+    ]
+}
