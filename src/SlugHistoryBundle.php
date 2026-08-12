@@ -14,6 +14,11 @@ use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 final class SlugHistoryBundle extends AbstractBundle
 {
     public const VERSION = '1.0.0';
+    private string $bundleRoot = "";
+    public function __construct(){
+        $this->bundleRoot = substr(__DIR__, 0, strlen(__DIR__) - 4);
+    }
+
     /**
      * Load and configure the bundle extension.
      *
@@ -25,13 +30,17 @@ final class SlugHistoryBundle extends AbstractBundle
      */
     public function loadExtension(array $config, ContainerConfigurator $configurator, ContainerBuilder $container): void
     {
-        $bundleRoot = substr(__DIR__, 0, strlen(__DIR__) - 4);
-        $configurator->import($bundleRoot."/config/services.yaml");
-        
-        $pathTemplate  = $bundleRoot."/templates";
-        $container->prependExtensionConfig('twig', [
-            "paths" => [$pathTemplate => "WsSlugHistoryBundle"],
-            'form_themes' => ['@@SlugHistory/form/slugged-type.html.twig']
-        ]);
+        $configurator->import($this->bundleRoot."/config/services.yaml");
+    }
+
+    public function prependExtension(ContainerConfigurator $container, ContainerBuilder $builder): void
+    {
+        if ($builder->hasExtension('twig')) {
+            $pathTemplate  = $this->bundleRoot."/templates";
+            $builder->prependExtensionConfig('twig', [
+                "paths" => [$pathTemplate => "WsSlugHistory"],
+                'form_themes' => ['@WsSlugHistory/form/slugged-type.html.twig']
+            ]);
+        }
     }
 }

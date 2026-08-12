@@ -71,6 +71,9 @@ class SluggedType extends AbstractType
         $view->vars['mappingFrom'] = $mappingFrom;
     }
 
+    public function getBlockPrefix(): string {
+        return "slugged_type";
+    }
     public function getParent(): string
     {
         return TextType::class;

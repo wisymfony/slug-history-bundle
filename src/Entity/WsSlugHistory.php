@@ -8,7 +8,7 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: WsSlugHistoryRepository::class)]
-#[ORM\Index(fields: ['oldPathKey'], name: "wisymfony_old_path_key_index")]
+#[ORM\Index(fields: ['oldPathKey'], name: "ws_slug_history_key_index")]
 #[ORM\HasLifecycleCallbacks()]
 class WsSlugHistory
 {
