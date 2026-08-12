@@ -1,4 +1,4 @@
-{% block slugged_widget %}
+{% block slugged_type_widget %}
     {% set prefix = id|split('_') %}
     {% set prefix = prefix[0] %}
 
@@ -21,7 +21,7 @@
     </label>
     
     {% if not app.request.attributes.get('_slugged_slugged_included') %}
-        {% set version = constant('Wisymfony\\SlugHistoryBundle\\SlugHistoryBundle::VERSION') %}
+        {% set version = constant('Wisoft\\SlugHistoryBundle\\SlugHistoryBundle::VERSION') %}
         <link rel="stylesheet" href="{{ asset('/bundles/slughistory/css/slugged-type.css' ~ '?v=' ~ version ) }}">
         <script src="{{ asset('/bundles/slughistory/js/slugged-type.min.js') ~ '?v=' ~ version }}" defer></script>
         {% do app.request.attributes.set('_slugged_slugged_included', true) %}

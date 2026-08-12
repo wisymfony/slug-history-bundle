@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Wisymfony\SlugHistoryBundle\Service\Storage;
+namespace Wisoft\SlugHistoryBundle\Service\Storage;
 
-use Wisymfony\SlugHistoryBundle\Entity\WiSymfonySlugHistory;
-use Wisymfony\SlugHistoryBundle\Repository\WiSymfonySlugHistoryRepository;
+use Wisoft\SlugHistoryBundle\Entity\WsSlugHistory;
+use Wisoft\SlugHistoryBundle\Repository\WsSlugHistoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -18,12 +18,16 @@ use Doctrine\ORM\EntityManagerInterface;
 class DatabaseSlugStorage implements SlugStorageInterface
 {
     private EntityManagerInterface $em;
-    private WiSymfonySlugHistoryRepository $repository;
 
-    public function __construct(EntityManagerInterface $em, WiSymfonySlugHistoryRepository $repository)
+    /**
+     * @var WsSlugHistoryRepository
+     */
+    private  $repository;
+
+    public function __construct(EntityManagerInterface $em)
     {
         $this->em = $em;
-        $this->repository = $repository;
+        $this->repository = $em->getRepository(WsSlugHistory::class);
     }
 
     /**
@@ -46,7 +50,7 @@ class DatabaseSlugStorage implements SlugStorageInterface
 
         $history = $this->repository->findOneBy(['oldPathKey' => md5($oldPath)], ['lastUpdatedAt' => 'DESC']);
         if (!$history) {
-            $history = new WiSymfonySlugHistory();
+            $history = new WsSlugHistory();
         }
         $history->setOldPath($oldPath);
         $history->setNewPath($newPathData["path"]);

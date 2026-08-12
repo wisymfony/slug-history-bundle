@@ -1,10 +1,12 @@
 <?php
 
-namespace Wisymfony\SlugHistoryBundle\Form\Type;
+namespace Wisoft\SlugHistoryBundle\Form\Type;
 
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Form\FormView;
+use Symfony\Component\Form\FormInterface;
 
 class SluggedType extends AbstractType
 {
@@ -21,10 +23,10 @@ class SluggedType extends AbstractType
         ]);
     }
 
-    public function buildView(\Symfony\Component\Form\FormView $view, \Symfony\Component\Form\FormInterface $form, array $options): void
+    public function buildView(FormView $view, FormInterface $form, array $options): void
     {
         $options = array_merge(['from' => ''], $options);
-        
+
         if (!is_string($options['from'])) {
             throw new \InvalidArgumentException("The 'from' option must be an string of field name.");
         }
@@ -69,6 +71,9 @@ class SluggedType extends AbstractType
         $view->vars['mappingFrom'] = $mappingFrom;
     }
 
+    public function getBlockPrefix(): string {
+        return "slugged_type";
+    }
     public function getParent(): string
     {
         return TextType::class;

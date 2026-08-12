@@ -1,5 +1,5 @@
 {
-    "name": "wisymfony/slug-history-bundle",
+    "name": "wisoft/slug-history-bundle",
     "description": "Automated SEO Management with 301 Redirects",
     "keywords": [
         "slug",
@@ -12,7 +12,7 @@
     "license": "MIT",
     "autoload": {
         "psr-4": {
-            "Wisymfony\\SlugHistoryBundle\\": "src/"
+            "Wisoft\\SlugHistoryBundle\\": "src/"
         }
     },
     "authors": [
@@ -42,7 +42,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Wisymfony\\SlugHistoryBundle\\Tests\\": "tests/"
+            "Wisoft\\SlugHistoryBundle\\Tests\\": "tests/"
         }
     },
     "conflict": {

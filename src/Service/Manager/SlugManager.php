@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Wisymfony\SlugHistoryBundle\Service\Manager;
+namespace Wisoft\SlugHistoryBundle\Service\Manager;
 
 use ReflectionClass;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Routing\RouterInterface;
-use Wisymfony\SlugHistoryBundle\Attribute\Slugged;
-use Wisymfony\SlugHistoryBundle\Service\Storage\SlugStorageInterface;
+use Wisoft\SlugHistoryBundle\Attribute\Slugged;
+use Wisoft\SlugHistoryBundle\Service\Storage\SlugStorageInterface;
+
 /**
  * Service that manages slug history mappings and generates redirect targets.
  *
@@ -36,12 +37,11 @@ final class SlugManager
      */
     public function __construct(
         #[Autowire(
-            expression: 'parameter("wisymfony_slug_history.storage") matches \'/^database$/i\' ? service("wisymfony_slug_history.database_slug_storage") : service("wisymfony_slug_history.cache_slug_storage")'
+            expression: 'parameter("ws_slug_history.storage") matches \'/^database$/i\' ? service("ws_slug_history.database_slug_storage") : service("ws_slug_history.cache_slug_storage")'
         )]
         private SlugStorageInterface $storageInterface,
         private RouterInterface $routerInterface
-    )
-    {
+    ) {
     }
 
     public function getRouterInterface(): RouterInterface
@@ -65,46 +65,37 @@ final class SlugManager
     {
         $sluggers = $this->getSlugged($object);
         foreach ($sluggers as $slugger) {
-            if ($slugger['attr'] instanceof Slugged) {
-                $attr = $slugger['attr'];
+            $attr = $slugger['attr'];
+            if (
+                !empty($attr->from) &&
+                isset($entityChangeSet[$attr->from]) &&
+                !isset($entityChangeSet[$slugger['name']])
+            ) {
+                $fromValue = $entityChangeSet[$attr->from][1];
+                $entityChangeSet = array_merge($this->updateSlugField($object, $slugger['name'], $fromValue), $entityChangeSet);
+            }
 
-                $oldSlug = $this->getFieldValueString($object, $slugger['name']);
-                if (
-                    !empty($attr->from) &&
-                    isset($entityChangeSet[$attr->from]) &&
-                    !isset($entityChangeSet[$slugger['name']])
-                ) {
-                    $fromValue = $entityChangeSet[$attr->from][1];
-                    $this->updateSlugField($object, $slugger['name'], $fromValue);
+
+            if (!empty($attr->routeName)) {
+                $oldRouteParams = [];
+                $newRouteParams = [];
+                if (!empty($attr->routeParams)) {
+                    $oldRouteParams = array_merge($oldRouteParams, $attr->routeParams);
+                    $newRouteParams = array_merge($newRouteParams, $attr->routeParams);
                 }
 
-                $newSlug = $this->getFieldValueString($object, $slugger['name']);
-                if (isset($entityChangeSet[$slugger['name']])) {
-                    $oldSlug = $entityChangeSet[$slugger['name']][0];
-                    $newSlug = $entityChangeSet[$slugger['name']][1];
-                }
+                $oldRouteParams = $this->applyMapperRouteParams($object, $oldRouteParams, $entityChangeSet);
+                $newRouteParams = $this->applyMapperRouteParams($object, $newRouteParams);
 
-                if (!empty($attr->routeName)) {
-                    $oldRouteParams = [];
-                    $newRouteParams = [];
-                    if (!empty($attr->routeParams)) {
-                        $oldRouteParams = array_merge($oldRouteParams, $attr->routeParams);
-                        $newRouteParams = array_merge($newRouteParams, $attr->routeParams);
-                    }
-
-                    $oldRouteParams = $this->applyMapperRouteParams($object, $oldRouteParams, $entityChangeSet);
-                    $newRouteParams = $this->applyMapperRouteParams($object, $newRouteParams);
-
-                    $oldPath = $this->routerInterface->generate($attr->routeName, $oldRouteParams);
-                    $newPath = $this->routerInterface->generate($attr->routeName, $newRouteParams);
-                    if ($oldPath != $newPath) {
-                        $this->slugUpdateList[$oldPath] = [
-                            'path' => $newPath,
-                            'entityClass' => get_class($object),
-                            'lastUpdatedAt' => time(),
-                            'oldPath' => $oldPath,
-                        ];
-                    }
+                $oldPath = $this->routerInterface->generate($attr->routeName, $oldRouteParams);
+                $newPath = $this->routerInterface->generate($attr->routeName, $newRouteParams);
+                if ($oldPath != $newPath) {
+                    $this->slugUpdateList[$oldPath] = [
+                        'path' => $newPath,
+                        'entityClass' => get_class($object),
+                        'lastUpdatedAt' => time(),
+                        'oldPath' => $oldPath,
+                    ];
                 }
             }
         }
@@ -121,7 +112,6 @@ final class SlugManager
     public function saveSlugUpdateList(): void
     {
         if (!empty($this->slugUpdateList)) {
-            
             foreach ($this->slugUpdateList as $oldPath => $newPathData) {
                 $this->storageInterface->savePath($oldPath, $newPathData);
             }
@@ -233,40 +223,33 @@ final class SlugManager
             $fieldValue = $value;
             if (is_string($value) && str_starts_with($value, '@')) {
                 $fieldPath = explode('.', substr($value, 1));
-                foreach ($fieldPath as $index => $fieldName) {
-                    if ($index === 0) {
-                        if (isset($entityChangeSet[$fieldName])) {
-                            $fieldValue = $entityChangeSet[$fieldName][0];
-                        } else {
-                            $fieldValue = $this->getFieldValue($object, $fieldName);
-                        }
-                    } else {
-                        if (is_object($fieldValue)) {
-                            $fieldValue = $this->getFieldValue($fieldValue, $fieldName);
-                        } else {
-                            $fieldValue = null;
-                            break;
-                        }
-                    }
-                }
+                $fieldValue = $this->getMapperRouteParamaValue($fieldPath, $object, $entityChangeSet);
             }
             $result[$key] = $fieldValue;
         }
         return $result;
     }
 
-    /**
-     * Get the value of a field from the object using a conventional getter.
-     *
-     * @param object $object    The entity instance.
-     * @param string $fieldName The field/property name (without "get").
-     *
-     * @return string|null The value returned by the getter, or null if not available.
-     */
-    private function getFieldValueString(object $object, string $fieldName): ?string
+    private function getMapperRouteParamaValue(array $fieldPath, object $object, array $entityChangeSet = []): mixed
     {
-        $value = $this->getFieldValue($object, $fieldName);
-        return is_string($value) ? $value : null;
+        $fieldValue = null;
+        foreach ($fieldPath as $index => $fieldName) {
+            if ($index === 0) {
+                if (isset($entityChangeSet[$fieldName])) {
+                    $fieldValue = $entityChangeSet[$fieldName][0];
+                } else {
+                    $fieldValue = $this->getFieldValue($object, $fieldName);
+                }
+            } else {
+                if (is_object($fieldValue)) {
+                    $fieldValue = $this->getFieldValue($fieldValue, $fieldName);
+                } else {
+                    $fieldValue = null;
+                    break;
+                }
+            }
+        }
+        return $fieldValue;
     }
 
     private function getFieldValue(object $object, string $fieldName): mixed
@@ -277,8 +260,6 @@ final class SlugManager
         }
         return null;
     }
-
-
 
     /**
      * Inspect the object with reflection and return properties annotated with `Slugged`.
@@ -299,9 +280,10 @@ final class SlugManager
         foreach ($reflection->getProperties() as $reflectionProperty) {
             $sluggedAttr = $reflectionProperty->getAttributes(Slugged::class);
             if ($sluggedAttr && !empty($sluggedAttr)) {
+                $attr = $sluggedAttr[0]->newInstance();
                 $slugged[] = [
                     "name" => $reflectionProperty->getName(),
-                    "attr" => $sluggedAttr[0]->newInstance()
+                    "attr" => $attr
                 ];
             }
         }
@@ -319,15 +301,19 @@ final class SlugManager
      *
      * @return void
      */
-    private function updateSlugField(object &$object, string $slugField, string $fromValue): void
+    private function updateSlugField(object &$object, string $slugField, string $fromValue): array
     {
+        $change = [];
         if (!empty($fromValue)) {
             $methodSetSlugValue = sprintf("set%s", ucfirst($slugField));
             if (method_exists($object, $methodSetSlugValue)) {
+                $oldSlug = $this->getFieldValue($object, $slugField);
                 $slug = $this->generateSlgFrom($fromValue);
                 $object->{$methodSetSlugValue}($slug);
+                $change[$slugField] = [$oldSlug, $slug];
             }
         }
+        return $change;
     }
 
     /**

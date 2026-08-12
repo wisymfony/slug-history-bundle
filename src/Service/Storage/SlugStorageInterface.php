@@ -1,7 +1,8 @@
 <?php
+
 declare(strict_types=1);
 
-namespace Wisymfony\SlugHistoryBundle\Service\Storage;
+namespace Wisoft\SlugHistoryBundle\Service\Storage;
 
 /**
  * Abstraction for slug history storage.

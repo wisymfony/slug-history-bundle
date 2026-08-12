@@ -1,16 +1,16 @@
 <?php
 
-namespace Wisymfony\SlugHistoryBundle\Entity;
+namespace Wisoft\SlugHistoryBundle\Entity;
 
-use App\Repository\WiSymfonySlugHistoryRepository;
+use Wisoft\SlugHistoryBundle\Repository\WsSlugHistoryRepository;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: WiSymfonySlugHistoryRepository::class)]
-#[ORM\Index(fields: ['oldPathKey'], name: "wisymfony_old_path_key_index")]
+#[ORM\Entity(repositoryClass: WsSlugHistoryRepository::class)]
+#[ORM\Index(fields: ['oldPathKey'], name: "ws_slug_history_key_index")]
 #[ORM\HasLifecycleCallbacks()]
-class WiSymfonySlugHistory
+class WsSlugHistory
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -33,13 +33,15 @@ class WiSymfonySlugHistory
     private ?DateTimeImmutable $lastUpdatedAt = null;
 
     #[ORM\PrePersist]
-    public function prePersist() : void {
+    public function prePersist(): void
+    {
         $this->lastUpdatedAt = new DateTimeImmutable();
         $this->oldPathKey = md5($this->oldPath);
     }
 
     #[ORM\PreUpdate]
-    public function preUpdate() : void {
+    public function preUpdate(): void
+    {
         $this->lastUpdatedAt = new DateTimeImmutable();
     }
 
