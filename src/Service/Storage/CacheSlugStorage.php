@@ -1,6 +1,8 @@
 <?php
+
 declare(strict_types=1);
-namespace Wisymfony\SlugHistoryBundle\Service\Storage;
+
+namespace Wisoft\SlugHistoryBundle\Service\Storage;
 
 use Symfony\Contracts\Cache\CacheInterface;
 
@@ -97,6 +99,6 @@ final class CacheSlugStorage implements SlugStorageInterface
      */
     private function generateCacheKeyBy(string $text): string
     {
-        return "wisymfony_slug_history.path.".md5($text);
+        return "ws_slug_history.path.".md5($text);
     }
 }

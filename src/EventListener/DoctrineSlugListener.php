@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Wisymfony\SlugHistoryBundle\EventListener;
+namespace Wisoft\SlugHistoryBundle\EventListener;
 
 use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Event\PostUpdateEventArgs;
 use Doctrine\ORM\Event\PreUpdateEventArgs;
-use Wisymfony\SlugHistoryBundle\Service\Manager\SlugManager;
+use Wisoft\SlugHistoryBundle\Service\Manager\SlugManager;
 
 /**
  * Doctrine event listener that detects slug changes on entities.

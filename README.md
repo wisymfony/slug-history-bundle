@@ -33,7 +33,7 @@ The bundle tracks slug changes on Doctrine entities and automatically redirects 
 Install the bundle with Composer:
 
 ```bash
-composer require wisymfony/slug-history-bundle
+composer require wisoft/slug-history-bundle
 ```
 
 The bundle supports automatic registration via Symfony Flex. If your app doesn't auto-register bundles, see [Manual activation](#manual-bundle-activation).
@@ -45,7 +45,7 @@ The bundle supports automatic registration via Symfony Flex. If your app doesn't
 If auto-registration is disabled, enable the bundle in `config/bundles.php`:
 
 ```php
-Wisymfony\SlugHistoryBundle\SlugHistoryBundle::class => ['all' => true],
+Wisoft\SlugHistoryBundle\SlugHistoryBundle::class => ['all' => true],
 ```
 
 ---
@@ -55,7 +55,7 @@ Wisymfony\SlugHistoryBundle\SlugHistoryBundle::class => ['all' => true],
 ### 1) Mark a slug field with `#[Slugged]`
 
 ```php
-use Wisymfony\SlugHistoryBundle\Attribute\Slugged;
+use Wisoft\SlugHistoryBundle\Attribute\Slugged;
 
 class Product
 {
@@ -99,7 +99,7 @@ class Product
 **Example (form builder):**
 
 ```php
-use Wisymfony\SlugHistoryBundle\Form\Type\SluggedType;
+use Wisoft\SlugHistoryBundle\Form\Type\SluggedType;
 
 $builder->add('slug', SluggedType::class, [
     'route' => [
@@ -150,18 +150,18 @@ Choose your backend using **one** of these methods:
 
 #### Method 1: Environment variable (recommended)
 
-Set `WISYMFONY_SLUG_HISTORY_STORAGE` in your `.env` file:
+Set `WS_SLUG_HISTORY_STORAGE` in your `.env` file:
 
 ```bash
 # .env or .env.local
-WISYMFONY_SLUG_HISTORY_STORAGE=cache
+WS_SLUG_HISTORY_STORAGE=cache
 ```
 
 Then alias `SlugStorageInterface` in `config/services.php`:
 
 ```php
-use Wisymfony\SlugHistoryBundle\Service\Storage\SlugStorageInterface;
-use Wisymfony\SlugHistoryBundle\Service\Storage\CacheSlugStorage;
+use Wisoft\SlugHistoryBundle\Service\Storage\SlugStorageInterface;
+use Wisoft\SlugHistoryBundle\Service\Storage\CacheSlugStorage;
 
 $services->alias(SlugStorageInterface::class, CacheSlugStorage::class);
 ```
@@ -170,7 +170,7 @@ $services->alias(SlugStorageInterface::class, CacheSlugStorage::class);
 
 ```yaml
 parameters:
-    wisymfony_slug_history.storage: 'cache'  # or 'database'
+    ws_slug_history.storage: 'cache'  # or 'database'
 ```
 
 #### Method 3: Direct service override in `config/services.yaml`
@@ -180,7 +180,7 @@ services:
     App\Service\MyCustomSlugStorage:
         arguments: ['@my_storage_dependency']
 
-    Wisymfony\SlugHistoryBundle\Service\Manager\SlugManager:
+    Wisoft\SlugHistoryBundle\Service\Manager\SlugManager:
         arguments:
             $storageInterface: '@App\Service\MyCustomSlugStorage'
 ```
@@ -189,11 +189,11 @@ services:
 
 ## Using DatabaseSlugStorage
 
-To use database-backed storage, the bundle provides a `WiSymfonySlugHistory` entity. Follow these steps:
+To use database-backed storage, the bundle provides a `WsSlugHistory` entity. Follow these steps:
 
 ### Step 1: Verify the entity exists
 
-The entity is included in the bundle at `src/Entity/WiSymfonySlugHistory.php`. It stores:
+The entity is included in the bundle at `src/Entity/WsSlugHistory.php`. It stores:
 
 | Column | Type | Purpose |
 |--------|------|---------|
@@ -219,8 +219,8 @@ php bin/console doctrine:migrations:migrate
 Update `config/services.php` to use `DatabaseSlugStorage`:
 
 ```php
-use Wisymfony\SlugHistoryBundle\Service\Storage\SlugStorageInterface;
-use Wisymfony\SlugHistoryBundle\Service\Storage\DatabaseSlugStorage;
+use Wisoft\SlugHistoryBundle\Service\Storage\SlugStorageInterface;
+use Wisoft\SlugHistoryBundle\Service\Storage\DatabaseSlugStorage;
 
 $services->alias(SlugStorageInterface::class, DatabaseSlugStorage::class);
 ```
@@ -228,7 +228,7 @@ $services->alias(SlugStorageInterface::class, DatabaseSlugStorage::class);
 Alternatively, set the environment variable:
 
 ```bash
-WISYMFONY_SLUG_HISTORY_STORAGE=database
+WS_SLUG_HISTORY_STORAGE=database
 ```
 
 ---

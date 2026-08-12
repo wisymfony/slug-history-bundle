@@ -1,13 +1,13 @@
 <?php
 
-namespace Wisymfony\SlugHistoryBundle;
+namespace Wisoft\SlugHistoryBundle;
 
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 
 /**
- * Bundle class for Wisymfony Slug History.
+ * Bundle class for Wisoft Slug History.
  *
  * Responsible for loading bundle service configuration into the container.
  */
@@ -25,14 +25,13 @@ final class SlugHistoryBundle extends AbstractBundle
      */
     public function loadExtension(array $config, ContainerConfigurator $configurator, ContainerBuilder $container): void
     {
-        $configurator->import(__DIR__."/../config/services.yaml");
+        $bundleRoot = substr(__DIR__, 0, strlen(__DIR__) - 4);
+        $configurator->import($bundleRoot."/config/services.yaml");
+        
+        $pathTemplate  = $bundleRoot."/templates";
         $container->prependExtensionConfig('twig', [
-            "paths" => [
-                __DIR__."/../templates" => "WisymfonySlugHistoryBundle"
-            ],
-        ]);
-        $container->prependExtensionConfig('twig', [
-            'form_themes' => ['@WisymfonySlugHistoryBundle/form/slugged-type.html.twig'],
+            "paths" => [$pathTemplate => "WsSlugHistoryBundle"],
+            'form_themes' => ['@@SlugHistory/form/slugged-type.html.twig']
         ]);
     }
 }

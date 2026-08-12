@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Wisymfony\SlugHistoryBundle\Attribute;
+namespace Wisoft\SlugHistoryBundle\Attribute;
 
 use Attribute;
 

@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Wisymfony\SlugHistoryBundle\Service\Manager;
+namespace Wisoft\SlugHistoryBundle\Service\Manager;
 
 use ReflectionClass;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Routing\RouterInterface;
-use Wisymfony\SlugHistoryBundle\Attribute\Slugged;
-use Wisymfony\SlugHistoryBundle\Service\Storage\SlugStorageInterface;
+use Wisoft\SlugHistoryBundle\Attribute\Slugged;
+use Wisoft\SlugHistoryBundle\Service\Storage\SlugStorageInterface;
+
 /**
  * Service that manages slug history mappings and generates redirect targets.
  *
@@ -40,8 +41,7 @@ final class SlugManager
         )]
         private SlugStorageInterface $storageInterface,
         private RouterInterface $routerInterface
-    )
-    {
+    ) {
     }
 
     public function getRouterInterface(): RouterInterface
@@ -67,8 +67,6 @@ final class SlugManager
         foreach ($sluggers as $slugger) {
             if ($slugger['attr'] instanceof Slugged) {
                 $attr = $slugger['attr'];
-
-                $oldSlug = $this->getFieldValueString($object, $slugger['name']);
                 if (
                     !empty($attr->from) &&
                     isset($entityChangeSet[$attr->from]) &&
@@ -78,11 +76,6 @@ final class SlugManager
                     $this->updateSlugField($object, $slugger['name'], $fromValue);
                 }
 
-                $newSlug = $this->getFieldValueString($object, $slugger['name']);
-                if (isset($entityChangeSet[$slugger['name']])) {
-                    $oldSlug = $entityChangeSet[$slugger['name']][0];
-                    $newSlug = $entityChangeSet[$slugger['name']][1];
-                }
 
                 if (!empty($attr->routeName)) {
                     $oldRouteParams = [];
@@ -121,7 +114,6 @@ final class SlugManager
     public function saveSlugUpdateList(): void
     {
         if (!empty($this->slugUpdateList)) {
-            
             foreach ($this->slugUpdateList as $oldPath => $newPathData) {
                 $this->storageInterface->savePath($oldPath, $newPathData);
             }
@@ -233,40 +225,33 @@ final class SlugManager
             $fieldValue = $value;
             if (is_string($value) && str_starts_with($value, '@')) {
                 $fieldPath = explode('.', substr($value, 1));
-                foreach ($fieldPath as $index => $fieldName) {
-                    if ($index === 0) {
-                        if (isset($entityChangeSet[$fieldName])) {
-                            $fieldValue = $entityChangeSet[$fieldName][0];
-                        } else {
-                            $fieldValue = $this->getFieldValue($object, $fieldName);
-                        }
-                    } else {
-                        if (is_object($fieldValue)) {
-                            $fieldValue = $this->getFieldValue($fieldValue, $fieldName);
-                        } else {
-                            $fieldValue = null;
-                            break;
-                        }
-                    }
-                }
+                $fieldValue = $this->getMapperRouteParamaValue($fieldPath, $object, $entityChangeSet);
             }
             $result[$key] = $fieldValue;
         }
         return $result;
     }
 
-    /**
-     * Get the value of a field from the object using a conventional getter.
-     *
-     * @param object $object    The entity instance.
-     * @param string $fieldName The field/property name (without "get").
-     *
-     * @return string|null The value returned by the getter, or null if not available.
-     */
-    private function getFieldValueString(object $object, string $fieldName): ?string
+    private function getMapperRouteParamaValue(array $fieldPath, object $object, array $entityChangeSet = []): mixed
     {
-        $value = $this->getFieldValue($object, $fieldName);
-        return is_string($value) ? $value : null;
+        $fieldValue = null;
+        foreach ($fieldPath as $index => $fieldName) {
+            if ($index === 0) {
+                if (isset($entityChangeSet[$fieldName])) {
+                    $fieldValue = $entityChangeSet[$fieldName][0];
+                } else {
+                    $fieldValue = $this->getFieldValue($object, $fieldName);
+                }
+            } else {
+                if (is_object($fieldValue)) {
+                    $fieldValue = $this->getFieldValue($fieldValue, $fieldName);
+                } else {
+                    $fieldValue = null;
+                    break;
+                }
+            }
+        }
+        return $fieldValue;
     }
 
     private function getFieldValue(object $object, string $fieldName): mixed
@@ -277,8 +262,6 @@ final class SlugManager
         }
         return null;
     }
-
-
 
     /**
      * Inspect the object with reflection and return properties annotated with `Slugged`.

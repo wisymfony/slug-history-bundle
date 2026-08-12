@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Wisymfony\SlugHistoryBundle\EventListener;
+namespace Wisoft\SlugHistoryBundle\EventListener;
 
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\KernelEvents;
-use Wisymfony\SlugHistoryBundle\Service\Manager\SlugManager;
+use Wisoft\SlugHistoryBundle\Service\Manager\SlugManager;
 
 #[AsEventListener(event : KernelEvents::EXCEPTION, priority: 10)]
 /**
