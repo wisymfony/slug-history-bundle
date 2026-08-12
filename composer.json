@@ -2,10 +2,39 @@
     "name": "wisoft/slug-history-bundle",
     "description": "Automated SEO Management with 301 Redirects",
     "keywords": [
-        "slug",
         "seo",
         "redirect",
-        "not found"
+        "redirects",
+        "slug-history",
+        "url-redirects",
+        "301-redirects",
+        "seo-friendly",
+        "seo-redirect",
+        "slug-management",
+        "symfony-bundle",
+        "symfony",
+        "symfony6",
+        "symfony7",
+        "symfony8",
+        "doctrine",
+        "doctrine-orm",
+        "url-migration",
+        "slug-changes",
+        "moved-permanently",
+        "url-preservation",
+        "cache-storage",
+        "database-storage",
+        "form-widget",
+        "automatic-redirect",
+        "route-generation",
+        "entity-tracking",
+        "old-url-redirect",
+        "slug-router",
+        "url-mapping",
+        "request-listener",
+        "slug-tracking",
+        "link-management",
+        "rest-api"
     ],
     "homepage": "https://github.com/wisymfony/slug-history-bundle",
     "type": "symfony-bundle",
@@ -19,6 +48,10 @@
         {
             "name": "Wisoft",
             "email": "contact@wi-soft.com"
+        },
+        {
+            "name": "Wisoft",
+            "email": "wisoft@outlook.fr"
         },
         {
             "name": "AHOMLANTO David",
