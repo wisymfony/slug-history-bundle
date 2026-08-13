@@ -32,8 +32,8 @@ class SluggedType extends AbstractType
         }
 
         $route = $options['route'];
-        if (!is_array($route) || !isset($route['name']) || !isset($route['slugParam'])) {
-            throw new \InvalidArgumentException("The 'route' option must be an array with 'name' and 'slugParam' keys.");
+        if (!is_array($route) || !isset($route['name'])) {
+            throw new \InvalidArgumentException("The 'route' option must be an array with 'name'.");
         }
 
         if (!isset($route['params'])) {
@@ -46,6 +46,10 @@ class SluggedType extends AbstractType
 
         if (!is_string($route['name'])) {
             throw new \InvalidArgumentException("The 'name' key in the 'route' option must be strings.");
+        }
+
+        if (empty($route['slugParam']) || !$route['slugParam']) {
+            $route['slugParam'] = $form->getName();
         }
 
         if (!empty($route['slugParam']) && isset($route['params'][$route['slugParam']])) {

@@ -21,14 +21,17 @@ services:
     ws_slug_history.cache_slug_storage:
         class: Wisoft\SlugHistoryBundle\Service\Storage\CacheSlugStorage
         autowire: true
-        arguments:
-            $cache: '@cache.app'
+    #     arguments:
+    #         $cache: '@cache.app'
     
     ws_slug_history.database_slug_storage:
         class: Wisoft\SlugHistoryBundle\Service\Storage\DatabaseSlugStorage
         autowire: true
         autoconfigure: true
-        arguments:
-            $em: '@doctrine.orm.entity_manager'
+    #     arguments:
+    #         $em: '@doctrine.orm.entity_manager'
 
-    Wisoft\SlugHistoryBundle\Service\Manager\SlugManager: ~
+    Wisoft\SlugHistoryBundle\Service\Manager\SlugManager:
+        autowire: true
+        arguments:
+            $storageInterface: '@=parameter("ws_slug_history.storage") matches "/^database$/i" ? service("ws_slug_history.database_slug_storage") : service("ws_slug_history.cache_slug_storage")'
