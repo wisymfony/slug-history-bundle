@@ -36,9 +36,6 @@ final class SlugManager
      * @param RouterInterface      $routerInterface Router used to generate route paths.
      */
     public function __construct(
-        #[Autowire(
-            expression: 'parameter("ws_slug_history.storage") matches \'/^database$/i\' ? service("ws_slug_history.database_slug_storage") : service("ws_slug_history.cache_slug_storage")'
-        )]
         private SlugStorageInterface $storageInterface,
         private RouterInterface $routerInterface
     ) {
@@ -79,6 +76,10 @@ final class SlugManager
             if (!empty($attr->routeName)) {
                 $oldRouteParams = [];
                 $newRouteParams = [];
+                if (!in_array("@".$slugger['name'], $attr->routeParams, true)) {
+                    $attr->routeParams[$slugger['name']] = "@".$slugger['name'];
+                }
+                
                 if (!empty($attr->routeParams)) {
                     $oldRouteParams = array_merge($oldRouteParams, $attr->routeParams);
                     $newRouteParams = array_merge($newRouteParams, $attr->routeParams);
